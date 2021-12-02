@@ -8,7 +8,8 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/bagasunix/go_blog/blogpb"
+	blogpb "github.com/bagasunix/go_blog/blogpb"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -24,6 +25,39 @@ type blogItem struct {
 	AuthorID string             `bson:"author_id,omitempty"`
 	Content  string             `bson:"content,omitempty"`
 	Title    string             `bson:"title,omitempty"`
+}
+
+func (*server) ReadBlog(ctx context.Context, req *blogpb.ReadBlogRequest) (*blogpb.ReadBlogResponse, error) {
+	fmt.Println("Read blog request")
+	blogID := req.GetBlogId()
+	oid, err := primitive.ObjectIDFromHex(blogID)
+	if err != nil {
+		return nil, status.Errorf(
+			codes.InvalidArgument,
+			fmt.Sprint("Cannot parse ID"),
+		)
+	}
+	// create an empty struuct
+	data := &blogItem{}
+	filter := bson.M{"_id": oid}
+
+	collection.FindOne(ctx, filter)
+	if err := res.Decode(data); err != nil {
+		return nil, status.Errorf(
+			codes.NotFound,
+			fmt.Sprintf("Cannot find blog with specified ID: %v", err),
+		)
+	}
+
+	return &blogpb.ReadBlogResponse{
+		Blog: &blogpb.Blog{
+			Id:       data.ID.Hex(),
+			AuthorId: data.AuthorID,
+			Title:    data.Title,
+			Content:  data.Content,
+		},
+	}, nil
+
 }
 
 func (*server) CreateBlog(ctx context.Context, req *blogpb.CreateBlogRequest) (*blogpb.CreateBlogResponse, error) {
@@ -86,7 +120,7 @@ func main() {
 	s := grpc.NewServer(opts...)
 	blogpb.RegisterBlogServiceServer(s, &server{})
 
-	lis, err := net.Listen("tcp", "0.0.0.0:5000")
+	lis, err := net.Listen("tcp", "0.0.0.0:3000")
 	if err != nil {
 		log.Fatalf("Failed to listen: %v", err)
 	}
