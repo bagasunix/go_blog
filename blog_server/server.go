@@ -41,7 +41,7 @@ func (*server) ReadBlog(ctx context.Context, req *blogpb.ReadBlogRequest) (*blog
 	data := &blogItem{}
 	filter := bson.M{"_id": oid}
 
-	collection.FindOne(ctx, filter)
+	res := collection.FindOne(ctx, filter)
 	if err := res.Decode(data); err != nil {
 		return nil, status.Errorf(
 			codes.NotFound,
